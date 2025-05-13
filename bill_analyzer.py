@@ -12,7 +12,8 @@ def extract_date(text):
     date_patterns = [
         r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})',  # DD/MM/YYYY or MM/DD/YYYY
         r'(\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4})',  # DD Month YYYY
-        r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4})'  # Month DD, YYYY
+        r'((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4})',  # Month DD, YYYY
+        r'(?:\(|-)?\s*(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})\s*(?:\)|-)?' # Format like (11th March 2025)
     ]
     
     for pattern in date_patterns:
@@ -27,9 +28,12 @@ def extract_amount(text):
     # Look for currency symbols followed by numbers
     amount_patterns = [
         r'[$£€](\d+\.\d{2})',  # $123.45
+        r'£(\d+\.\d{2})',  # £123.45 (specific for pound symbol)
         r'(\d+\.\d{2})[$£€]',  # 123.45$
         r'Total:?\s*[$£€]?(\d+\.\d{2})',  # Total: $123.45
-        r'Amount\s*due:?\s*[$£€]?(\d+\.\d{2})'  # Amount due: $123.45
+        r'Amount\s*due:?\s*[$£€]?(\d+\.\d{2})',  # Amount due: $123.45
+        r'Total\s+(?:Electricity|Gas)?\s+Charges\s*[£$€]?(\d+\.\d{2})',  # Total Electricity Charges £3.08
+        r'Total\s+charges\s+for\s+bill\s*[£$€]?(\d+\.\d{2})'  # Total charges for bill £3.08
     ]
     
     for pattern in amount_patterns:
@@ -52,7 +56,8 @@ def extract_account_number(text):
     """Extract account number from bill text."""
     account_patterns = [
         r'Account\s*(?:Number|No|#)?\s*:?\s*(\d+[-\s]?\d+)',
-        r'Account\s*(?:Number|No|#)?\s*:?\s*([A-Z0-9]+)'
+        r'Account\s*(?:Number|No|#)?\s*:?\s*([A-Z0-9]+)',
+        r'Supply\s+number\s*:?\s*([A-Z0-9]+)'  # Supply number: 19000232...
     ]
     
     for pattern in account_patterns:
@@ -68,6 +73,38 @@ def calculate_fingerprint(text):
     normalized_text = re.sub(r'\s+', '', text.lower())
     # Create a hash of the text
     return hashlib.md5(normalized_text.encode()).hexdigest()
+
+def extract_meter_number(text):
+    """Extract meter number from bill text."""
+    meter_patterns = [
+        r'Meter\s+(?:Number|No|#)?\s*:?\s*([A-Z0-9]+)',
+        r'(?:for|from)\s+Meter\s+([A-Z0-9]+)'  # Energy Charges for Meter 17K0160497
+    ]
+    
+    for pattern in meter_patterns:
+        matches = re.findall(pattern, text, re.IGNORECASE)
+        if matches:
+            return matches[0]
+    
+    return None
+
+def extract_address(text):
+    """Extract address from bill text."""
+    address_patterns = [
+        r'Supply\s+Address:?\s*(.*?)(?:Postcode|$)',
+        r'Address:?\s*(.*?)(?:Postcode|$)'
+    ]
+    
+    for pattern in address_patterns:
+        matches = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+        if matches:
+            # Clean up the address
+            address = matches.group(1).strip()
+            # Remove extra whitespace and newlines
+            address = re.sub(r'\s+', ' ', address)
+            return address
+    
+    return None
 
 def process_bill_images(folder_path):
     """Process all image files in the given folder."""
@@ -93,6 +130,8 @@ def process_bill_images(folder_path):
                 amount = extract_amount(text)
                 bill_type = extract_bill_type(text)
                 account_number = extract_account_number(text)
+                meter_number = extract_meter_number(text)
+                address = extract_address(text)
                 fingerprint = calculate_fingerprint(text)
                 
                 bill_data.append({
@@ -101,6 +140,8 @@ def process_bill_images(folder_path):
                     'Amount': amount,
                     'Type': bill_type,
                     'Account Number': account_number,
+                    'Meter Number': meter_number,
+                    'Address': address,
                     'Fingerprint': fingerprint
                 })
                 
@@ -160,10 +201,25 @@ def main():
     # Create a DataFrame for all bills
     df = pd.DataFrame(bill_data)
     
+    # Format the DataFrame for better display
+    # Fill NaN values with "Not found" for better readability
+    df = df.fillna("Not found")
+    
     # Save to CSV
     csv_path = os.path.join(current_dir, 'bill_data.csv')
     df.to_csv(csv_path, index=False)
     print(f"Bill data saved to {csv_path}")
+    
+    # Print a summary of the extracted data
+    print("\nExtracted Bill Information:")
+    for i, bill in enumerate(bill_data, 1):
+        print(f"\nBill {i}: {bill['Filename']}")
+        print(f"  Type: {bill['Type']}")
+        print(f"  Date: {bill['Date']}")
+        print(f"  Amount: £{bill['Amount'] if bill['Amount'] != 'Not found' else 'Not found'}")
+        print(f"  Account Number: {bill['Account Number']}")
+        print(f"  Meter Number: {bill['Meter Number']}")
+        print(f"  Address: {bill['Address']}")
     
     # Find duplicates
     duplicates = identify_duplicates(bill_data)
