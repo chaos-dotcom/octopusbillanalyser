@@ -244,9 +244,26 @@ def main():
         # Remove the temporary datetime column as it's no longer needed
         df = df.drop(columns=['Start Date DT'])
 
+    # Calculate total amount before filling NaN for the 'Amount' column specifically
+    # Ensure 'Amount' column exists and has some data
+    if 'Amount' in df.columns and not df['Amount'].isnull().all():
+        # Convert 'Amount' to numeric, errors='coerce' will turn non-numbers into NaN
+        numeric_amounts = pd.to_numeric(df['Amount'], errors='coerce')
+        total_amount = numeric_amounts.sum()
+        
+        # Create summary rows
+        total_row = {'Filename': 'Total', 'Amount': round(total_amount, 2)}
+        split_row = {'Filename': 'Company/Personal Split (50%)', 'Amount': round(total_amount / 2, 2)}
+        
+        # Append summary rows to the DataFrame
+        # Use pd.concat to append dictionaries as new rows
+        summary_df = pd.DataFrame([total_row, split_row])
+        df = pd.concat([df, summary_df], ignore_index=True)
+
     # Format the DataFrame for display and CSV output
     # Fill NaN values (which includes original None values for dates that couldn't be parsed by to_datetime,
     # or if 'Start Date' was None initially) with "Not found" for better readability.
+    # This will also fill other columns for the summary rows.
     df = df.fillna("Not found")
     
     # Save to CSV
