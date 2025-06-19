@@ -229,9 +229,24 @@ def main():
     
     # Create a DataFrame for all bills
     df = pd.DataFrame(bill_data)
-    
-    # Format the DataFrame for better display
-    # Fill NaN values with "Not found" for better readability
+
+    # Sort by 'Start Date' if the column exists and has sortable data
+    if 'Start Date' in df.columns and not df['Start Date'].isnull().all():
+        # Create a temporary column for datetime conversion to sort
+        # errors='coerce' will turn unparseable dates into NaT (Not a Time)
+        # This preserves the original 'Start Date' string column
+        df['Start Date DT'] = pd.to_datetime(df['Start Date'], errors='coerce')
+        
+        # Sort by the new datetime column, most recent first
+        # NaT values (unparseable/missing dates) will be placed last
+        df = df.sort_values(by='Start Date DT', ascending=False, na_position='last')
+        
+        # Remove the temporary datetime column as it's no longer needed
+        df = df.drop(columns=['Start Date DT'])
+
+    # Format the DataFrame for display and CSV output
+    # Fill NaN values (which includes original None values for dates that couldn't be parsed by to_datetime,
+    # or if 'Start Date' was None initially) with "Not found" for better readability.
     df = df.fillna("Not found")
     
     # Save to CSV
