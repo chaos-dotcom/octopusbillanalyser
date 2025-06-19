@@ -262,9 +262,9 @@ def main():
 
     # Format the DataFrame for display and CSV output
     # Fill NaN values (which includes original None values for dates that couldn't be parsed by to_datetime,
-    # or if 'Start Date' was None initially) with "Not found" for better readability.
+    # or if 'Start Date' was None initially) with " " for better readability.
     # This will also fill other columns for the summary rows.
-    df = df.fillna("Not found")
+    df = df.fillna(" ")
     
     # Save to CSV
     csv_path = os.path.join(current_dir, 'bill_data.csv')
@@ -275,15 +275,15 @@ def main():
     print("\nExtracted Bill Information:")
     for i, bill in enumerate(bill_data, 1):
         print(f"\nBill {i}: {bill['Filename']}")
-        print(f"  Type: {bill.get('Type', 'Not found')}")
-        print(f"  Date: {bill.get('Date', 'Not found')}") # General bill date
-        print(f"  Tariff: {bill.get('Tariff', 'Not found')}")
-        print(f"  Period Start: {bill.get('Start Date', 'Not found')}")
-        print(f"  Period End: {bill.get('End Date', 'Not found')}")
-        print(f"  Amount: £{bill.get('Amount', 'Not found') if bill.get('Amount') != 'Not found' else 'Not found'}") # Ensure 'Amount' key exists
-        print(f"  Account Number: {bill.get('Account Number', 'Not found')}")
-        print(f"  Meter Number: {bill.get('Meter Number', 'Not found')}")
-        print(f"  Address: {bill.get('Address', 'Not found')}")
+        print(f"  Type: {bill.get('Type', ' ')}")
+        print(f"  Date: {bill.get('Date', ' ')}") # General bill date
+        print(f"  Tariff: {bill.get('Tariff', ' ')}")
+        print(f"  Period Start: {bill.get('Start Date', ' ')}")
+        print(f"  Period End: {bill.get('End Date', ' ')}")
+        print(f"  Amount: £{bill.get('Amount', ' ') if bill.get('Amount') != ' ' else ' '}") # Ensure 'Amount' key exists
+        print(f"  Account Number: {bill.get('Account Number', ' ')}")
+        print(f"  Meter Number: {bill.get('Meter Number', ' ')}")
+        print(f"  Address: {bill.get('Address', ' ')}")
     
     # Find duplicates
     duplicates = identify_duplicates(bill_data)
