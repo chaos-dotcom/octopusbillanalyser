@@ -67,6 +67,31 @@ def extract_account_number(text):
     
     return None
 
+def extract_tariff_and_billing_period(text):
+    """Extract tariff name, start date, and end date from bill text."""
+    # Pattern for "Tariff Name (StartDate - EndDate)"
+    # Example: "Cosy Octopus (12th May 2025 - 24th May 2025)"
+    
+    date_pattern_part = r'\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}'
+    
+    tariff_names = [
+        "Cosy Octopus", "Agile Octopus", "Octopus Tracker",
+        # Add more known tariff names if needed
+    ]
+    
+    for tariff_name_base in tariff_names:
+        # Regex to capture the tariff name itself and the two dates within parentheses
+        pattern_str = rf'({re.escape(tariff_name_base)})\s*\(\s*({date_pattern_part})\s*-\s*({date_pattern_part})\s*\)'
+        
+        match = re.search(pattern_str, text, re.IGNORECASE)
+        if match:
+            tariff = match.group(1).strip()  # The matched tariff name
+            start_date_str = match.group(2).strip()
+            end_date_str = match.group(3).strip()
+            return tariff, start_date_str, end_date_str
+            
+    return None, None, None
+
 def calculate_fingerprint(text):
     """Create a fingerprint of the bill to help identify duplicates."""
     # Remove all whitespace and convert to lowercase
@@ -126,7 +151,8 @@ def process_bill_images(folder_path):
                 text = pytesseract.image_to_string(image)
                 
                 # Extract information
-                date = extract_date(text)
+                date = extract_date(text) # General date, could be issue date
+                tariff, start_date, end_date = extract_tariff_and_billing_period(text)
                 amount = extract_amount(text)
                 bill_type = extract_bill_type(text)
                 account_number = extract_account_number(text)
@@ -136,7 +162,10 @@ def process_bill_images(folder_path):
                 
                 bill_data.append({
                     'Filename': filename,
-                    'Date': date,
+                    'Date': date, # General bill date
+                    'Tariff': tariff,
+                    'Start Date': start_date,
+                    'End Date': end_date,
                     'Amount': amount,
                     'Type': bill_type,
                     'Account Number': account_number,
@@ -214,12 +243,15 @@ def main():
     print("\nExtracted Bill Information:")
     for i, bill in enumerate(bill_data, 1):
         print(f"\nBill {i}: {bill['Filename']}")
-        print(f"  Type: {bill['Type']}")
-        print(f"  Date: {bill['Date']}")
-        print(f"  Amount: £{bill['Amount'] if bill['Amount'] != 'Not found' else 'Not found'}")
-        print(f"  Account Number: {bill['Account Number']}")
-        print(f"  Meter Number: {bill['Meter Number']}")
-        print(f"  Address: {bill['Address']}")
+        print(f"  Type: {bill.get('Type', 'Not found')}")
+        print(f"  Date: {bill.get('Date', 'Not found')}") # General bill date
+        print(f"  Tariff: {bill.get('Tariff', 'Not found')}")
+        print(f"  Period Start: {bill.get('Start Date', 'Not found')}")
+        print(f"  Period End: {bill.get('End Date', 'Not found')}")
+        print(f"  Amount: £{bill.get('Amount', 'Not found') if bill.get('Amount') != 'Not found' else 'Not found'}") # Ensure 'Amount' key exists
+        print(f"  Account Number: {bill.get('Account Number', 'Not found')}")
+        print(f"  Meter Number: {bill.get('Meter Number', 'Not found')}")
+        print(f"  Address: {bill.get('Address', 'Not found')}")
     
     # Find duplicates
     duplicates = identify_duplicates(bill_data)
